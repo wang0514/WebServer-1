@@ -22,17 +22,29 @@ const int EPOLLWAIT_TIME = 10000;
 
 typedef shared_ptr<Channel> SP_Channel;
 
+/**
+ * 构造函数
+ * 创建epoll_fd描述符
+ * 创建events_（4096）数组
+ */
 Epoll::Epoll():
     epollFd_(epoll_create1(EPOLL_CLOEXEC)),
     events_(EVENTSNUM)
 {
     assert(epollFd_ > 0);
 }
+/**
+ * 析构函数
+ */
 Epoll::~Epoll()
 { }
 
 
-// 注册新描述符
+/**
+ * 添加新的描述符
+ * @param request 指向channel对象的智能指针
+ * @param timeout 设置超时时间
+ */
 void Epoll::epoll_add(SP_Channel request, int timeout)
 {
     int fd = request->getFd();
@@ -47,7 +59,7 @@ void Epoll::epoll_add(SP_Channel request, int timeout)
 
     request->EqualAndUpdateLastEvents();
 
-    fd2chan_[fd] = request;
+    fd2chan_[fd] = request;//添加request到channel数组
     if(epoll_ctl(epollFd_, EPOLL_CTL_ADD, fd, &event) < 0)
     {
         perror("epoll_add error");
@@ -56,12 +68,17 @@ void Epoll::epoll_add(SP_Channel request, int timeout)
 }
 
 
-// 修改描述符状态
+/**
+ * 修改描述符状态
+ * @param request
+ * @param timeout
+ */
 void Epoll::epoll_mod(SP_Channel request, int timeout)
 {
     if (timeout > 0)
         add_timer(request, timeout);
     int fd = request->getFd();
+    //判断是否是上一次处理的事件，如果不是就要进行修改更新epoll_event
     if (!request->EqualAndUpdateLastEvents())
     {
         struct epoll_event event;
@@ -75,8 +92,10 @@ void Epoll::epoll_mod(SP_Channel request, int timeout)
     }
 }
 
-
-// 从epoll中删除描述符
+ /**
+  * 从epoll中删除描述符
+  * @param request
+  */
 void Epoll::epoll_del(SP_Channel request)
 {
     int fd = request->getFd();
@@ -96,12 +115,17 @@ void Epoll::epoll_del(SP_Channel request)
 
 
 
-// 返回活跃事件数
+/**
+ * 返回活跃事件数
+ * @return
+ */
 std::vector<SP_Channel> Epoll::poll()
 {
     while (true)
     {
-        int event_count = epoll_wait(epollFd_, &*events_.begin(), events_.size(), EPOLLWAIT_TIME);
+        //有时间的阻塞，timeout设置为10000
+        cout<<"start epoll_wait"<<endl;
+        int event_count = epoll_wait(epollFd_, &*events_.begin(), events_.size(), -1/*EPOLLWAIT_TIME*/);
         if (event_count < 0)
             perror("epoll wait error");
         std::vector<SP_Channel> req_data = getEventsRequest(event_count);
@@ -115,7 +139,11 @@ void Epoll::handleExpired()
     timerManager_.handleExpiredEvent();
 }
 
-// 分发处理函数
+/**
+ * 分发处理函数
+ * @param events_num 就绪事件的个数
+ * @return channel数组
+ */
 std::vector<SP_Channel> Epoll::getEventsRequest(int events_num)
 {
     std::vector<SP_Channel> req_data;

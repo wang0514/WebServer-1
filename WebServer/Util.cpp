@@ -41,6 +41,14 @@ ssize_t readn(int fd, void *buff, size_t n)
     return readSum;
 }
 
+/**
+ * 针对epoll的ET模式的读操作
+ * 必须读到EAGAIN为止
+ * @param fd
+ * @param inBuffer 存储读到的数据
+ * @param zero 为true表示读到的数据长度为0
+ * @return 读到的数据长度
+ */
 ssize_t readn(int fd, std::string &inBuffer, bool &zero)
 {
     ssize_t nread = 0;
@@ -182,16 +190,32 @@ ssize_t writen(int fd, std::string &sbuff)
     return writeSum;
 }
 
+/**
+ * 在linux下写socket的程序的时候，如果尝试send到一个disconnected socket上，
+ * 就会让底层抛出一个SIGPIPE信号。
+ *这个信号的缺省处理方法是退出进程，大多数时候这都不是我们期望的。
+ * 因此我们需要重载这个信号的处理方法。调用以上代码，即可安全的屏蔽SIGPIPE。
+ */
 void handle_for_sigpipe()
 {
     struct sigaction sa;
     memset(&sa, '\0', sizeof(sa));
+    /**
+     * 忽略的处理方式，这个方式和默认的忽略是不一样的语意，暂且我们把忽略定义为SIG_IGN，
+     * 在这种方式下，子进程状态信息会被丢弃，也就是自动回收了，所以不会产生僵尸进程
+     */
     sa.sa_handler = SIG_IGN;
     sa.sa_flags = 0;
     if(sigaction(SIGPIPE, &sa, NULL))
         return;
 }
 
+/**
+ * 使用fcntl修改文件描述符的属性
+ * 改为非阻塞模式
+ * @param fd
+ * @return
+ */
 int setSocketNonBlocking(int fd)
 {
     int flag = fcntl(fd, F_GETFL, 0);
@@ -204,6 +228,10 @@ int setSocketNonBlocking(int fd)
     return 0;
 }
 
+/**
+ * 禁用 Nagle’s Algorithm
+ * @param fd
+ */
 void setSocketNodelay(int fd) 
 {
     int enable = 1;
@@ -224,6 +252,12 @@ void shutDownWR(int fd)
     //printf("shutdown\n");
 }
 
+/**
+ * socket套接字初始化，绑定，监听的过程
+ * 在server类构造的时候被使用
+ * @param port
+ * @return
+ */
 int socket_bind_listen(int port)
 {
     // 检查port值，取正确区间范围
@@ -250,6 +284,7 @@ int socket_bind_listen(int port)
         return -1;
 
     // 开始监听，最大等待队列长为LISTENQ
+    // 监听最大文件描述符个数为2048
     if(listen(listen_fd, 2048) == -1)
         return -1;
 

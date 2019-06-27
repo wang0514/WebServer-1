@@ -2,6 +2,11 @@
 // @Email xxbbb@vip.qq.com
 #include "EventLoopThreadPool.h"
 
+/**
+ * 线程池构造函数
+ * @param baseLoop
+ * @param numThreads
+ */
 EventLoopThreadPool::EventLoopThreadPool(EventLoop* baseLoop, int numThreads)
 :   baseLoop_(baseLoop),
     started_(false),
@@ -15,10 +20,15 @@ EventLoopThreadPool::EventLoopThreadPool(EventLoop* baseLoop, int numThreads)
     }
 }
 
+/**
+ * 线程池开启函数
+ */
 void EventLoopThreadPool::start()
 {
     baseLoop_->assertInLoopThread();
     started_ = true;
+    //循环开启numThreads_个事件，分别放到EventLoopThread指针数组中
+    //同时放到eventloop指针数组中
     for (int i = 0; i < numThreads_; ++i)
     {
         std::shared_ptr<EventLoopThread> t(new EventLoopThread());
@@ -30,8 +40,9 @@ void EventLoopThreadPool::start()
 EventLoop *EventLoopThreadPool::getNextLoop()
 {
     baseLoop_->assertInLoopThread();
-    assert(started_);
-    EventLoop *loop = baseLoop_;
+    assert(started_);//确认线程池是否开启
+    EventLoop *loop = baseLoop_;//获取eventloop事件
+    //TODO 猜测是一种环形队列
     if (!loops_.empty())
     {
         loop = loops_[next_];

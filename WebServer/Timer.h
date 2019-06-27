@@ -26,7 +26,7 @@ public:
 
 private:
     bool deleted_;
-    size_t expiredTime_;
+    size_t expiredTime_;//加上timeout后的截止时间
     std::shared_ptr<HttpData> SPHttpData;
 };
 

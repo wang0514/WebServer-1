@@ -92,6 +92,9 @@ char favicon[555] = {
   'B', '\x60', '\x82',
 };
 
+/**
+ * 用于初始化请求文件的类型
+ */
 void MimeType::init()
 {
     mime[".html"] = "text/html";
@@ -110,8 +113,16 @@ void MimeType::init()
     mime["default"] = "text/html";
 }
 
+/**
+ * 找suffix对应的文件类型
+ * 如果找不到对应的类型，就直接返回默认的"text/html"类型
+ * 其他情况根据map的信息进行返回
+ * @param suffix
+ * @return
+ */
 std::string MimeType::getMime(const std::string &suffix)
 {
+    //保证init函数在一个线程里只会执行一次
     pthread_once(&once_control, MimeType::init);
     if (mime.find(suffix) == mime.end())
         return mime["default"];
@@ -126,12 +137,12 @@ HttpData::HttpData(EventLoop *loop, int connfd):
         fd_(connfd),
         error_(false),
         connectionState_(H_CONNECTED),
-        method_(METHOD_GET),
-        HTTPVersion_(HTTP_11),
+        method_(METHOD_GET),//默认是get方法
+        HTTPVersion_(HTTP_11),//默认版本是http 1.1
         nowReadPos_(0), 
-        state_(STATE_PARSE_URI), 
+        state_(STATE_PARSE_URI), //处于解析URL阶段
         hState_(H_START),
-        keepAlive_(false)
+        keepAlive_(false)//长连接默认关闭
 {
     //loop_->queueInLoop(bind(&HttpData::setHandlers, this));
     channel_->setReadHandler(bind(&HttpData::handleRead, this));
@@ -139,6 +150,9 @@ HttpData::HttpData(EventLoop *loop, int connfd):
     channel_->setConnHandler(bind(&HttpData::handleConn, this));
 }
 
+/**
+ * http类的清除函数
+ */
 void HttpData::reset()
 {
     //inBuffer_.clear();
@@ -149,6 +163,14 @@ void HttpData::reset()
     hState_ = H_START;
     headers_.clear();
     //keepAlive_ = false;
+    //weak_ptr用于解决”引用计数”模型循环依赖问题，weak_ptr指向一个对象，并不增减该对象的引用计数器。
+    //weak_ptr用于配合shared_ptr使用，并不影响动态对象的生命周期，即其存在与否并不影响对象的引用计数器。
+    //weak_ptr并没有重载operator->和operator *操作符，因此不可直接通过weak_ptr使用对象。
+    //weak_ptr提供了expired()与lock()成员函数，
+    //前者用于判断weak_ptr指向的对象是否已被销毁，
+    //后者返回其所指对象的shared_ptr智能指针(对象销毁时返回”空”shared_ptr)。
+
+    //TODO 需要理解
     if (timer_.lock())
     {
         shared_ptr<TimerNode> my_timer(timer_.lock());
@@ -157,6 +179,7 @@ void HttpData::reset()
     }
 }
 
+//TODO 不知道在干啥
 void HttpData::seperateTimer()
 {
     //cout << "seperateTimer" << endl;
@@ -168,6 +191,9 @@ void HttpData::seperateTimer()
     }
 }
 
+/**
+ * http读操作处理
+ */
 void HttpData::handleRead()
 {
     __uint32_t &events_ = channel_->getEvents();
@@ -311,6 +337,9 @@ void HttpData::handleRead()
     }
 }
 
+/**
+ * http data 处理写操作
+ */
 void HttpData::handleWrite()
 {
     if (!error_ && connectionState_ != H_DISCONNECTED)
@@ -327,6 +356,9 @@ void HttpData::handleWrite()
     }
 }
 
+/**
+ * HttpData 处理连接
+ */
 void HttpData::handleConn()
 {
     seperateTimer();
@@ -714,6 +746,7 @@ void HttpData::handleError(int fd, int err_num, string short_msg)
     writen(fd, send_buff, strlen(send_buff));
 }
 
+//TODO 待解析
 void HttpData::handleClose()
 {
     connectionState_ = H_DISCONNECTED;

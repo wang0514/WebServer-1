@@ -4,6 +4,13 @@
 #include <cstdlib>
 #include <string>
 
+/**
+ * 整个项目的一些处理函数都放在这里
+ * @param fd
+ * @param buff
+ * @param n
+ * @return
+ */
 ssize_t readn(int fd, void *buff, size_t n);
 ssize_t readn(int fd, std::string &inBuffer, bool &zero);
 ssize_t readn(int fd, std::string &inBuffer);

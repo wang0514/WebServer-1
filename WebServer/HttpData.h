@@ -14,6 +14,9 @@ class EventLoop;
 class TimerNode;
 class Channel;
 
+/**
+ * 枚举处理状态
+ */
 enum ProcessState
 {
     STATE_PARSE_URI = 1,
@@ -23,12 +26,16 @@ enum ProcessState
     STATE_FINISH
 };
 
+/**
+ * 枚举URL状态
+ */
 enum URIState
 {
     PARSE_URI_AGAIN = 1,
     PARSE_URI_ERROR,
     PARSE_URI_SUCCESS,
 };
+
 
 enum HeaderState
 {
@@ -76,13 +83,17 @@ enum HttpVersion
     HTTP_11
 };
 
+/**
+ * 类：用于描述消息内容类型的因特网标准
+ */
 class MimeType
 {
 private:
     static void init();
+    //使用unordered_map存储消息内容类型
     static std::unordered_map<std::string, std::string> mime;
-    MimeType();
-    MimeType(const MimeType &m);
+    MimeType();//构造函数
+    MimeType(const MimeType &m);//拷贝构造函数
 
 public:
     static std::string getMime(const std::string &suffix);
@@ -110,24 +121,24 @@ public:
     void newEvent();
 
 private:
-    EventLoop *loop_;
-    std::shared_ptr<Channel> channel_;
-    int fd_;
-    std::string inBuffer_;
-    std::string outBuffer_;
-    bool error_;
-    ConnectionState connectionState_;
+    EventLoop *loop_; //EventLoop事件指针
+    std::shared_ptr<Channel> channel_;//Channel指针
+    int fd_;//文件描述符
+    std::string inBuffer_;//缓冲区
+    std::string outBuffer_;//缓冲区
+    bool error_;//是否出错的标志
+    ConnectionState connectionState_;//枚举连接的状态
 
-    HttpMethod method_;
-    HttpVersion HTTPVersion_;
-    std::string fileName_;
-    std::string path_;
-    int nowReadPos_;
-    ProcessState state_;
-    ParseState hState_;
-    bool keepAlive_;
-    std::map<std::string, std::string> headers_;
-    std::weak_ptr<TimerNode> timer_;
+    HttpMethod method_;//http请求方法枚举
+    HttpVersion HTTPVersion_;//http版本枚举
+    std::string fileName_;//请求的文件名
+    std::string path_;//请求的文件路径
+    int nowReadPos_;//TODO
+    ProcessState state_;//处理状态
+    ParseState hState_;//分割状态
+    bool keepAlive_;//是否保持长连接
+    std::map<std::string, std::string> headers_;//头部信息的map
+    std::weak_ptr<TimerNode> timer_;//计时器指针
 
     void handleRead();
     void handleWrite();

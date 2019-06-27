@@ -5,35 +5,52 @@
 #include <unistd.h>
 #include <queue>
 
-
+/**
+ * TimerNode构造函数
+ * @param requestData HttpData类
+ * @param timeout
+ */
 TimerNode::TimerNode(std::shared_ptr<HttpData> requestData, int timeout)
 :   deleted_(false),
     SPHttpData(requestData)
 {
     struct timeval now;
-    gettimeofday(&now, NULL);
-    // 以毫秒计
+    gettimeofday(&now, NULL);//使用函数gettimeofday()函数来得到时间。它的精度可以达到微妙
     expiredTime_ = (((now.tv_sec % 10000) * 1000) + (now.tv_usec / 1000)) + timeout;
 }
 
+/**
+ * 析构函数
+ * 关闭http的处理连接
+ */
 TimerNode::~TimerNode()
 {
     if (SPHttpData)
         SPHttpData->handleClose();
 }
-
-TimerNode::TimerNode(TimerNode &tn):
+/**
+ * 拷贝构造函数
+ * @param tn
+ */
+TimerNode::TimerNode(TimerNode &tn)://TODO具体功能待定
     SPHttpData(tn.SPHttpData)
 { }
 
-
+/**
+ * 更新最新的截止时间
+ * @param timeout
+ */
 void TimerNode::update(int timeout)
 {
     struct timeval now;
     gettimeofday(&now, NULL);
     expiredTime_ = (((now.tv_sec % 10000) * 1000) + (now.tv_usec / 1000)) + timeout;
 }
-
+/**
+ * 判断连接的当前处理时间是否超时
+ * 超时的话直接删除标志设置为1
+ * @return
+ */
 bool TimerNode::isValid()
 {
     struct timeval now;
@@ -47,7 +64,10 @@ bool TimerNode::isValid()
         return false;
     }
 }
-
+/**
+ * 清除httpdata类的数据
+ * 删除函数标志设置为1
+ */
 void TimerNode::clearReq()
 {
     SPHttpData.reset();
@@ -61,6 +81,12 @@ TimerManager::TimerManager()
 TimerManager::~TimerManager()
 { }
 
+/**
+ * 添加计数器节点
+ * 根据优先级队列进行节点的更新
+ * @param SPHttpData
+ * @param timeout
+ */
 void TimerManager::addTimer(std::shared_ptr<HttpData> SPHttpData, int timeout)
 {
     SPTimerNode new_node(new TimerNode(SPHttpData, timeout));
@@ -68,8 +94,9 @@ void TimerManager::addTimer(std::shared_ptr<HttpData> SPHttpData, int timeout)
     SPHttpData->linkTimer(new_node);
 }
 
-
-/* 处理逻辑是这样的~
+/**
+ * 优先级队列节点的删除
+ * 处理逻辑是这样的~
 因为(1) 优先队列不支持随机访问
 (2) 即使支持，随机删除某节点后破坏了堆的结构，需要重新更新堆结构。
 所以对于被置为deleted的时间节点，会延迟到它(1)超时 或 (2)它前面的节点都被删除时，它才会被删除。
@@ -78,7 +105,7 @@ void TimerManager::addTimer(std::shared_ptr<HttpData> SPHttpData, int timeout)
 (1) 第一个好处是不需要遍历优先队列，省时。
 (2) 第二个好处是给超时时间一个容忍的时间，就是设定的超时时间是删除的下限(并不是一到超时时间就立即删除)，如果监听的请求在超时后的下一次请求中又一次出现了，
 就不用再重新申请RequestData节点了，这样可以继续重复利用前面的RequestData，减少了一次delete和一次new的时间。
-*/
+ */
 
 void TimerManager::handleExpiredEvent()
 {

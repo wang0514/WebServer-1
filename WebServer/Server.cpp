@@ -8,7 +8,12 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-
+/**
+ * server的构造函数
+ * @param loop ：eventloop
+ * @param threadNum ：线程数量
+ * @param port ：端口号
+ */
 Server::Server(EventLoop *loop, int threadNum, int port)
 :   loop_(loop),
     threadNum_(threadNum),
@@ -27,25 +32,38 @@ Server::Server(EventLoop *loop, int threadNum, int port)
     }
 }
 
+/**
+ * server端开启操作
+ */
 void Server::start()
 {
+    /**
+     * 开启线程池的操作，生成threadNum个线程，每个线程在EventLoopThread对象中，
+     * 且有一个Thread数组和一个EventLoop数组存储这些内容
+     * 每个创建好的线程都在处于pooler状态，且初始化的线程只有对应的EventFd描述符
+     */
     eventLoopThreadPool_->start();
     //acceptChannel_->setEvents(EPOLLIN | EPOLLET | EPOLLONESHOT);
-    acceptChannel_->setEvents(EPOLLIN | EPOLLET);
-    acceptChannel_->setReadHandler(bind(&Server::handNewConn, this));
-    acceptChannel_->setConnHandler(bind(&Server::handThisConn, this));
-    loop_->addToPoller(acceptChannel_, 0);
-    started_ = true;
+    acceptChannel_->setEvents(EPOLLIN | EPOLLET);//设置epoll为ET模式
+    acceptChannel_->setReadHandler(bind(&Server::handNewConn, this));//注册acceptChannel_处理新连接函数
+    acceptChannel_->setConnHandler(bind(&Server::handThisConn, this));//注册acceptChannel_处理当前连接函数
+    loop_->addToPoller(acceptChannel_, 0);//将acceptChannel加入epoll检测，这是mainReactor
+    started_ = true;//设置开启标志
 }
 
+/**
+ * server处理新的连接
+ */
 void Server::handNewConn()
 {
+    //client的地址信息，需要先声明，然后接受时传进去
     struct sockaddr_in client_addr;
     memset(&client_addr, 0, sizeof(struct sockaddr_in));
     socklen_t client_addr_len = sizeof(client_addr);
     int accept_fd = 0;
     while((accept_fd = accept(listenFd_, (struct sockaddr*)&client_addr, &client_addr_len)) > 0)
     {
+        //轮询法确定监听到的文件描述符交给哪一个EventLoopThread处理
         EventLoop *loop = eventLoopThreadPool_->getNextLoop();
         LOG << "New connection from " << inet_ntoa(client_addr.sin_addr) << ":" << ntohs(client_addr.sin_port);
         // cout << "new connection" << endl;
@@ -72,11 +90,17 @@ void Server::handNewConn()
             return;
         }
 
+        //禁用 Nagle’s Algorithm
         setSocketNodelay(accept_fd);
         //setSocketNoLinger(accept_fd);
 
-        shared_ptr<HttpData> req_info(new HttpData(loop, accept_fd));
-        req_info->getChannel()->setHolder(req_info);
+        shared_ptr<HttpData> req_info(new HttpData(loop, accept_fd));//TODO
+        req_info->getChannel()->setHolder(req_info);//TODO
+        /**
+         * 跨线程调用，也就是主Reactor将新任务添加到SubReactor中进行处理，这里是一个异步调用
+         * 因为不是当前线程调用这个处理函数，queueInLoop会将这个函数添加到pendingFunctors_队列
+         * 紧接着唤醒loop所在EventLoop，也就是往loop对应的EventLoop对象中的EventFd写一个byte的数据
+         */
         loop->queueInLoop(std::bind(&HttpData::newEvent, req_info));
     }
     acceptChannel_->setEvents(EPOLLIN | EPOLLET);

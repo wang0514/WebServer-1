@@ -7,6 +7,9 @@
 #include "base/noncopyable.h"
 #include "EventLoop.h"
 
+/**
+ * 实现第一个生产者消费者模型
+ */
 class EventLoopThread :noncopyable
 {
 public:

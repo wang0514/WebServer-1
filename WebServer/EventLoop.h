@@ -26,7 +26,7 @@ public:
     void runInLoop(Functor&& cb);
     void queueInLoop(Functor&& cb);
     bool isInLoopThread() const { return threadId_ == CurrentThread::tid(); }
-    void assertInLoopThread()
+    void assertInLoopThread()//确认是不是当前线程，即满足one thread one loop条件
     {
         assert(isInLoopThread());
     }
@@ -50,11 +50,11 @@ public:
     
 private:
     // 声明顺序 wakeupFd_ > pwakeupChannel_
-    bool looping_;
-    shared_ptr<Epoll> poller_;
+    bool looping_;//判断当前是否有循环，one thread one loop
+    shared_ptr<Epoll> poller_;//epoll事件
     int wakeupFd_;
-    bool quit_;
-    bool eventHandling_;
+    bool quit_;//退出标志
+    bool eventHandling_;//是否正在处理event事件
     mutable MutexLock mutex_;
     std::vector<Functor> pendingFunctors_;
     bool callingPendingFunctors_;
